@@ -163,7 +163,7 @@ function extractSignals(html, url) {
   return signals;
 }
 
-async function callGroq(signals) {
+async function callGemini(signals) {
   const prompt = `You are a brutally honest, witty, and specific website roast comedian. You've been given real extracted data from a live website. Your job is to roast it savagely but helpfully — like a senior developer and UX designer who's seen too many bad websites and has zero patience for mediocrity.
 
 IMPORTANT: Be SPECIFIC. Reference the actual content you see below. Quote their actual words. Call out exact problems. Do NOT give generic advice. Every sentence should feel like it could ONLY apply to this specific website.
@@ -225,27 +225,28 @@ Now roast this website. Return ONLY valid JSON, no markdown, no backticks, no ex
 
 Include 4-7 roast items. Each must reference something SPECIFIC you saw in the data. Be funny, specific, and devastating.`;
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      max_tokens: 1500,
-      temperature: 0.85,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.85,
+          maxOutputTokens: 1500,
+        },
+      }),
+    }
+  );
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Groq API error: ${response.status} — ${err}`);
+    throw new Error(`Gemini API error: ${response.status} — ${err}`);
   }
 
   const data = await response.json();
-  const text = data.choices[0].message.content;
+  const text = data.candidates[0].content.parts[0].text;
   const clean = text.replace(/```json|```/g, "").trim();
   return JSON.parse(clean);
 }
@@ -281,7 +282,7 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: `Site returned HTTP ${status}. Can't roast what doesn't exist.` });
     }
     const signals = extractSignals(html, url);
-    const roast = await callGroq(signals);
+    const roast = await callGemini(signals);
     return res.status(200).json({ roast, signals });
   } catch (err) {
     console.error(err);
