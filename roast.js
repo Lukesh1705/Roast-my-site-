@@ -48,20 +48,16 @@ function fetchUrl(urlString, redirectCount = 0) {
 function extractSignals(html, url) {
   const signals = { url };
 
-  // Title
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   signals.title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : null;
 
-  // Meta description
   const metaDescMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
     || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
   signals.metaDescription = metaDescMatch ? metaDescMatch[1].trim() : null;
 
-  // Meta keywords
   const metaKwMatch = html.match(/<meta[^>]+name=["']keywords["'][^>]+content=["']([^"']+)["']/i);
   signals.metaKeywords = metaKwMatch ? metaKwMatch[1].trim() : null;
 
-  // OG tags
   const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
   signals.ogTitle = ogTitle ? ogTitle[1] : null;
   const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i);
@@ -69,26 +65,20 @@ function extractSignals(html, url) {
   const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
   signals.hasOgImage = !!ogImage;
 
-  // Favicon
   signals.hasFavicon = /<link[^>]+(rel=["'][^"']*icon[^"']*["'])[^>]*>/i.test(html);
 
-  // H1s
   const h1Matches = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)];
   signals.h1s = h1Matches.map(m => m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
 
-  // H2s
   const h2Matches = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
   signals.h2s = h2Matches.map(m => m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 10);
 
-  // Buttons and CTAs
   const btnMatches = [...html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/gi)];
   signals.buttons = btnMatches.map(m => m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 15);
 
-  // Links (anchor text)
   const anchorMatches = [...html.matchAll(/<a[^>]*>([\s\S]*?)<\/a>/gi)];
   signals.anchorTexts = anchorMatches.map(m => m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()).filter(t => t.length > 1 && t.length < 80).slice(0, 30);
 
-  // Nav items
   const navMatch = html.match(/<nav[^>]*>([\s\S]*?)<\/nav>/i);
   if (navMatch) {
     const navAnchors = [...navMatch[1].matchAll(/<a[^>]*>([\s\S]*?)<\/a>/gi)];
@@ -97,7 +87,6 @@ function extractSignals(html, url) {
     signals.navItems = [];
   }
 
-  // Images — count and alt text audit
   const imgMatches = [...html.matchAll(/<img([^>]*)>/gi)];
   signals.totalImages = imgMatches.length;
   const alts = imgMatches.map(m => {
@@ -108,31 +97,22 @@ function extractSignals(html, url) {
   signals.emptyAltCount = alts.filter(a => a === "").length;
   signals.sampleAlts = alts.filter(a => a !== "__MISSING__" && a !== "").slice(0, 8);
 
-  // Forms
   const formMatches = [...html.matchAll(/<form[^>]*>/gi)];
   signals.formCount = formMatches.length;
   const inputMatches = [...html.matchAll(/<input[^>]*>/gi)];
   signals.inputCount = inputMatches.length;
 
-  // Scripts
   const scriptSrcs = [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)];
   signals.externalScripts = scriptSrcs.map(m => m[1]).slice(0, 10);
 
-  // Analytics
   signals.hasGoogleAnalytics = /google-analytics\.com|gtag\(|ga\(/.test(html);
   signals.hasGTM = /googletagmanager\.com/.test(html);
-
-  // Viewport meta
   signals.hasViewport = /<meta[^>]+name=["']viewport["']/i.test(html);
-
-  // Charset
   signals.hasCharset = /<meta[^>]+charset/i.test(html);
 
-  // Inline styles heavy usage
   const inlineStyleMatches = [...html.matchAll(/style=["'][^"']+["']/gi)];
   signals.inlineStyleCount = inlineStyleMatches.length;
 
-  // Body text sample (first 2000 chars of visible text)
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   if (bodyMatch) {
     const visibleText = bodyMatch[1]
@@ -145,25 +125,19 @@ function extractSignals(html, url) {
     signals.wordCount = visibleText.split(/\s+/).filter(Boolean).length;
   }
 
-  // Footer
   const footerMatch = html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i);
   if (footerMatch) {
     signals.footerText = footerMatch[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
   }
 
-  // Copyright year check
   const copyrightMatch = html.match(/©\s*(\d{4})/);
   signals.copyrightYear = copyrightMatch ? copyrightMatch[1] : null;
 
-  // CSS frameworks
   signals.usesTailwind = /tailwind/i.test(html);
   signals.usesBootstrap = /bootstrap/i.test(html);
   signals.usesFontAwesome = /font-awesome|fontawesome/i.test(html);
-
-  // HTTPS check
   signals.isHttps = url.startsWith("https://");
 
-  // Compute a real score
   let score = 100;
   if (!signals.metaDescription) score -= 10;
   if (!signals.h1s.length) score -= 10;
@@ -189,7 +163,7 @@ function extractSignals(html, url) {
   return signals;
 }
 
-async function callClaude(signals) {
+async function callGroq(signals) {
   const prompt = `You are a brutally honest, witty, and specific website roast comedian. You've been given real extracted data from a live website. Your job is to roast it savagely but helpfully — like a senior developer and UX designer who's seen too many bad websites and has zero patience for mediocrity.
 
 IMPORTANT: Be SPECIFIC. Reference the actual content you see below. Quote their actual words. Call out exact problems. Do NOT give generic advice. Every sentence should feel like it could ONLY apply to this specific website.
@@ -231,7 +205,7 @@ FOOTER TEXT: ${signals.footerText || "none"}
 
 COMPUTED SCORE: ${signals.score}/100
 
-Now roast this website. Structure your response as valid JSON only, no markdown, no backticks:
+Now roast this website. Return ONLY valid JSON, no markdown, no backticks, no explanation:
 
 {
   "score": ${signals.score},
@@ -249,29 +223,29 @@ Now roast this website. Structure your response as valid JSON only, no markdown,
   "backhanded_compliment": "one thing that's not terrible, framed as a backhanded compliment"
 }
 
-Include 4-7 roast items. Each must reference something SPECIFIC you saw in the data. The roast items should vary — don't just pile on SEO issues if there are UX, copy, and accessibility problems too. Be funny, be specific, be devastating.`;
+Include 4-7 roast items. Each must reference something SPECIFIC you saw in the data. Be funny, specific, and devastating.`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
+      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: "llama-3.3-70b-versatile",
       max_tokens: 1500,
+      temperature: 0.85,
       messages: [{ role: "user", content: prompt }],
     }),
   });
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Claude API error: ${response.status} — ${err}`);
+    throw new Error(`Groq API error: ${response.status} — ${err}`);
   }
 
   const data = await response.json();
-  const text = data.content.map(b => b.text || "").join("");
+  const text = data.choices[0].message.content;
   const clean = text.replace(/```json|```/g, "").trim();
   return JSON.parse(clean);
 }
@@ -296,7 +270,7 @@ module.exports = async function handler(req, res) {
     url = parsed.url;
     if (!url) throw new Error("No URL");
     if (!url.startsWith("http")) url = "https://" + url;
-    new URL(url); // validate
+    new URL(url);
   } catch {
     return res.status(400).json({ error: "Please provide a valid URL." });
   }
@@ -307,7 +281,7 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: `Site returned HTTP ${status}. Can't roast what doesn't exist.` });
     }
     const signals = extractSignals(html, url);
-    const roast = await callClaude(signals);
+    const roast = await callGroq(signals);
     return res.status(200).json({ roast, signals });
   } catch (err) {
     console.error(err);
